@@ -75,7 +75,8 @@ def _run_job(job_id, path):
                 job["state"] = "cancelled"
                 return
 
-            business_name = eligible.iloc[i][NAME_COL]
+            raw_name = eligible.iloc[i][NAME_COL]
+            business_name = "" if pd.isna(raw_name) else str(raw_name).strip()
             url = normalize_url(eligible.iloc[i][URL_COL])
 
             job["current"] = business_name
@@ -84,7 +85,7 @@ def _run_job(job_id, path):
             results.append({"Business Name": business_name, "URL": url, "Email": email})
             job["processed"] = i + 1
             job["log"].append({
-                "business": str(business_name),
+                "business": business_name,
                 "url": url,
                 "email": email,
                 "error": error,

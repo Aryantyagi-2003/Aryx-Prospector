@@ -52,7 +52,8 @@ def main():
 
     results = []
     for i in range(1, len(eligible) + 1):
-        business_name = eligible.iloc[i - 1][NAME_COL]
+        raw_name = eligible.iloc[i - 1][NAME_COL]
+        business_name = "" if pd.isna(raw_name) else str(raw_name).strip()
         raw_url = eligible.iloc[i - 1][URL_COL]
         url = normalize_url(raw_url)
 
