@@ -1,9 +1,10 @@
 """
 Aryx Prospector - web app.
 
-Flask backend that lets you upload ANY CSV, map its columns (business name,
-website URL, optional status), filter rows, scrape each site for an email
-address, and download a clean results CSV.
+Flask backend: upload your CSV (columns "Business Name", "Website / URL",
+and "Status"), it automatically filters for eligible rows, scrapes each
+site for an email address, and gives you a clean results CSV to download.
+No manual column mapping - the expected columns are fixed.
 
 Run with:  python3 app.py
 Then open: http://127.0.0.1:5000
@@ -28,6 +29,14 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB upload cap
 
+# Fixed column names - this is what your CSV is expected to contain.
+NAME_COL = "Business Name"
+URL_COL = "Website / URL"
+STATUS_COL = "Status"
+
+EXCLUDED_STATUSES = {"no deal", "awaiting response", "dead"}
+INCLUDED_STATUS = "to contact"
+
 # In-memory job store. Fine for a single-user local tool.
 JOBS: dict[str, dict] = {}
 JOBS_LOCK = threading.Lock()
@@ -38,77 +47,24 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/upload", methods=["POST"])
-def upload():
-    file = request.files.get("file")
-    if file is None or file.filename == "":
-        return jsonify({"error": "No file provided."}), 400
-    if not file.filename.lower().endswith(".csv"):
-        return jsonify({"error": "Please upload a .csv file."}), 400
+def _filter_eligible(df: pd.DataFrame) -> pd.DataFrame:
+    website = df[URL_COL].fillna("").astype(str).str.strip()
+    has_website = website.ne("") & website.str.lower().ne("no website")
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    upload_id = uuid.uuid4().hex
-    path = os.path.join(UPLOAD_DIR, f"{upload_id}.csv")
-    file.save(path)
+    status = df[STATUS_COL].fillna("").astype(str).str.strip().str.lower() if STATUS_COL in df.columns else pd.Series("", index=df.index)
+    is_blank_status = status.eq("")
+    is_to_contact = status.eq(INCLUDED_STATUS)
+    is_excluded = status.isin(EXCLUDED_STATUSES)
 
-    try:
-        df = pd.read_csv(path, dtype=str)
-    except Exception as exc:
-        os.remove(path)
-        return jsonify({"error": f"Could not parse CSV: {exc}"}), 400
-
-    if df.empty or len(df.columns) == 0:
-        os.remove(path)
-        return jsonify({"error": "CSV has no columns."}), 400
-
-    preview = df.head(4).fillna("").to_dict(orient="records")
-
-    return jsonify({
-        "upload_id": upload_id,
-        "columns": list(df.columns),
-        "row_count": len(df),
-        "preview": preview,
-    })
+    status_ok = (is_to_contact | is_blank_status) & ~is_excluded
+    return df[has_website & status_ok].copy()
 
 
-@app.route("/api/column-values", methods=["POST"])
-def column_values():
-    data = request.get_json(force=True)
-    upload_id = data.get("upload_id")
-    column = data.get("column")
-    path = os.path.join(UPLOAD_DIR, f"{upload_id}.csv")
-    if not upload_id or not os.path.isfile(path):
-        return jsonify({"error": "Unknown upload_id."}), 404
-
-    df = pd.read_csv(path, dtype=str)
-    if column not in df.columns:
-        return jsonify({"error": "Unknown column."}), 400
-
-    series = df[column].fillna("").astype(str).str.strip()
-    has_blank = series.eq("").any()
-    values = sorted({v for v in series if v}, key=str.lower)
-
-    return jsonify({"values": values, "has_blank": bool(has_blank)})
-
-
-def _run_job(job_id, path, name_col, url_col, status_col, included_statuses, include_blank_status):
+def _run_job(job_id, path):
     job = JOBS[job_id]
     try:
         df = pd.read_csv(path, dtype=str)
-
-        website = df[url_col].fillna("").astype(str).str.strip()
-        has_website = website.ne("") & website.str.lower().ne("no website")
-
-        if status_col and status_col in df.columns:
-            status = df[status_col].fillna("").astype(str).str.strip().str.lower()
-            is_blank_status = status.eq("")
-            included_lower = {s.lower() for s in (included_statuses or [])}
-            is_included_value = status.isin(included_lower)
-            status_ok = is_included_value | (is_blank_status & include_blank_status)
-        else:
-            status_ok = pd.Series(True, index=df.index)
-
-        eligible = df[has_website & status_ok].copy()
+        eligible = _filter_eligible(df)
 
         job["total"] = len(eligible)
         job["state"] = "running"
@@ -119,8 +75,8 @@ def _run_job(job_id, path, name_col, url_col, status_col, included_statuses, inc
                 job["state"] = "cancelled"
                 return
 
-            business_name = eligible.iloc[i][name_col]
-            url = normalize_url(eligible.iloc[i][url_col])
+            business_name = eligible.iloc[i][NAME_COL]
+            url = normalize_url(eligible.iloc[i][URL_COL])
 
             job["current"] = business_name
             email, error = scrape_email(url)
@@ -147,22 +103,36 @@ def _run_job(job_id, path, name_col, url_col, status_col, included_statuses, inc
         job["error"] = str(exc)
 
 
-@app.route("/api/start", methods=["POST"])
-def start():
-    data = request.get_json(force=True)
-    upload_id = data.get("upload_id")
-    name_col = data.get("name_col")
-    url_col = data.get("url_col")
-    status_col = data.get("status_col") or None
-    included_statuses = data.get("included_statuses") or []
-    include_blank_status = bool(data.get("include_blank_status", True))
+@app.route("/api/upload", methods=["POST"])
+def upload():
+    file = request.files.get("file")
+    if file is None or file.filename == "":
+        return jsonify({"error": "No file provided."}), 400
+    if not file.filename.lower().endswith(".csv"):
+        return jsonify({"error": "Please upload a .csv file."}), 400
 
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    upload_id = uuid.uuid4().hex
     path = os.path.join(UPLOAD_DIR, f"{upload_id}.csv")
-    if not upload_id or not os.path.isfile(path):
-        return jsonify({"error": "Unknown upload_id."}), 404
-    if not name_col or not url_col:
-        return jsonify({"error": "name_col and url_col are required."}), 400
+    file.save(path)
 
+    try:
+        df = pd.read_csv(path, dtype=str)
+    except Exception as exc:
+        os.remove(path)
+        return jsonify({"error": f"Could not parse CSV: {exc}"}), 400
+
+    missing = [c for c in (NAME_COL, URL_COL) if c not in df.columns]
+    if missing:
+        os.remove(path)
+        return jsonify({
+            "error": (
+                f"Missing required column(s): {', '.join(missing)}. "
+                f"Your CSV has: {', '.join(df.columns)}"
+            )
+        }), 400
+
+    # Kick off scraping immediately - no manual mapping step.
     job_id = uuid.uuid4().hex
     with JOBS_LOCK:
         JOBS[job_id] = {
@@ -176,14 +146,10 @@ def start():
             "cancelled": False,
         }
 
-    thread = threading.Thread(
-        target=_run_job,
-        args=(job_id, path, name_col, url_col, status_col, included_statuses, include_blank_status),
-        daemon=True,
-    )
+    thread = threading.Thread(target=_run_job, args=(job_id, path), daemon=True)
     thread.start()
 
-    return jsonify({"job_id": job_id})
+    return jsonify({"job_id": job_id, "row_count": len(df)})
 
 
 @app.route("/api/progress/<job_id>")

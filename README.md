@@ -1,8 +1,13 @@
 # Aryx Prospector
 
-A local lead-generation tool: upload any CSV of businesses, map its columns,
-filter to eligible rows, and scrape each business's website for a contact
+A local lead-generation tool: upload a CSV of businesses, it automatically
+filters to eligible rows and scrapes each business's website for a contact
 email — no paid APIs involved.
+
+Your CSV must have these columns (exact names):
+- `Business Name`
+- `Website / URL`
+- `Status`
 
 ## Setup
 
@@ -18,12 +23,13 @@ python3 app.py
 
 Then open **http://127.0.0.1:5000** in your browser.
 
-1. Upload a CSV.
-2. Map the Business Name and Website/URL columns (and optionally a Status
-   column, with checkboxes to include/exclude specific status values and
-   blank statuses).
-3. Click **Start scraping** and watch live progress.
-4. Download `Aryx_Prospector_Leads.csv` when it finishes.
+1. Upload your CSV — scraping starts automatically.
+2. Watch live progress.
+3. Download `Aryx_Prospector_Leads.csv` when it finishes.
+
+A row is eligible if its `Website / URL` is populated and isn't "No website",
+and its `Status` is `To Contact` or blank (rows with `No Deal`,
+`Awaiting Response`, or `Dead` are skipped).
 
 Your uploaded CSVs and generated results stay in the local `uploads/` and
 `outputs/` folders and are never committed to git (see `.gitignore`).

@@ -140,132 +140,13 @@ body {
   margin: 12px 0 0;
 }
 
-.preview-scroll {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin-bottom: 20px;
-}
-
-.preview-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 12px;
+.expected-cols code {
   font-family: var(--mono);
-}
-
-.preview-table th,
-.preview-table td {
-  padding: 8px 12px;
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--border);
-}
-
-.preview-table th {
-  background: var(--surface-raised);
-  color: var(--text-dim);
-  font-weight: 600;
-  position: sticky;
-  top: 0;
-}
-
-.preview-table td {
-  color: var(--text);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.preview-table tr:last-child td { border-bottom: none; }
-
-.field-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.field label {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-dim);
-  margin-bottom: 6px;
-}
-
-.optional {
-  font-weight: 400;
-  color: var(--text-faint);
-}
-
-select {
-  width: 100%;
-  padding: 10px 12px;
+  font-size: 12px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 9px;
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 14px;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239aa1b2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 32px;
-}
-
-select:focus { outline: none; border-color: var(--accent); }
-
-.status-block {
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-  margin-bottom: 20px;
-}
-
-.status-block.hidden { display: none; }
-
-.block-hint { margin-top: 0; margin-bottom: 12px; }
-
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  color: var(--text);
-  margin-bottom: 12px;
-  cursor: pointer;
-}
-
-.checkbox-row input { accent-color: var(--accent); width: 15px; height: 15px; }
-
-.chip-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-raised);
-  font-size: 12.5px;
-  cursor: pointer;
-  user-select: none;
-  color: var(--text-dim);
-  transition: all 0.12s ease;
-}
-
-.chip input { display: none; }
-
-.chip.checked {
-  border-color: var(--accent);
-  background: rgba(109, 140, 255, 0.12);
-  color: var(--text);
+  border-radius: 5px;
+  padding: 1px 6px;
 }
 
 .btn-primary {

@@ -19,7 +19,7 @@ from scraper import normalize_url, scrape_email
 INPUT_CSV = "Business OutReaches - Sheet1(7).csv"
 OUTPUT_CSV = "Aryx_Prospector_Leads.csv"
 
-NAME_COL = "Redstone Pizza"
+NAME_COL = "Business Name"
 URL_COL = "Website / URL"
 STATUS_COL = "Status"
 

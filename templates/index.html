@@ -15,7 +15,7 @@
       <div class="hero-mark">AP</div>
       <div>
         <h1>Aryx Prospector</h1>
-        <p class="subtitle">Upload any CSV, find the eligible leads, and pull their email addresses straight off their websites.</p>
+        <p class="subtitle">Upload your CSV. It finds businesses that still need contacting and pulls an email off their website.</p>
       </div>
     </header>
 
@@ -36,53 +36,13 @@
         </label>
         <input id="file-input" type="file" accept=".csv" hidden />
         <p id="upload-status" class="hint"></p>
+        <p class="hint expected-cols">Expects columns named <code>Business Name</code>, <code>Website / URL</code>, and <code>Status</code>.</p>
       </section>
 
-      <!-- STEP 2: Mapping -->
-      <section class="card hidden" id="step-map">
-        <div class="card-head">
-          <span class="step-num">2</span>
-          <h2>Map your columns</h2>
-        </div>
-
-        <p class="hint block-hint">Here's a peek at your file so you can tell which column is which:</p>
-        <div class="preview-scroll">
-          <table id="preview-table" class="preview-table"></table>
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="col-name">Business Name column</label>
-            <select id="col-name"></select>
-          </div>
-          <div class="field">
-            <label for="col-url">Website / URL column</label>
-            <select id="col-url"></select>
-          </div>
-          <div class="field">
-            <label for="col-status">Status column <span class="optional">(optional)</span></label>
-            <select id="col-status">
-              <option value="">— None —</option>
-            </select>
-          </div>
-        </div>
-
-        <div id="status-filter-block" class="status-block hidden">
-          <p class="hint block-hint">Rows are included if their status is checked below, or if you keep blank statuses included.</p>
-          <label class="checkbox-row">
-            <input type="checkbox" id="include-blank" checked />
-            <span>Include rows with a blank / empty status</span>
-          </label>
-          <div id="status-values" class="chip-grid"></div>
-        </div>
-
-        <button id="start-btn" class="btn-primary" disabled>Start scraping</button>
-      </section>
-
-      <!-- STEP 3: Progress -->
+      <!-- STEP 2: Progress -->
       <section class="card hidden" id="step-progress">
         <div class="card-head">
-          <span class="step-num">3</span>
+          <span class="step-num">2</span>
           <h2>Scraping in progress</h2>
         </div>
 
@@ -100,7 +60,7 @@
         <button id="cancel-btn" class="btn-secondary">Cancel</button>
       </section>
 
-      <!-- STEP 4: Done -->
+      <!-- STEP 3: Done -->
       <section class="card hidden" id="step-done">
         <div class="card-head">
           <span class="step-num">✓</span>
