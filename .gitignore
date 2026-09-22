@@ -1,0 +1,14 @@
+# Private data - never commit
+*.csv
+uploads/
+outputs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors / OS
+.DS_Store
+.vscode/

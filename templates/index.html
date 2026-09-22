@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aryx Prospector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="hero-mark">AP</div>
+      <div>
+        <h1>Aryx Prospector</h1>
+        <p class="subtitle">Upload any CSV, find the eligible leads, and pull their email addresses straight off their websites.</p>
+      </div>
+    </header>
+
+    <main class="card-stack">
+
+      <!-- STEP 1: Upload -->
+      <section class="card" id="step-upload">
+        <div class="card-head">
+          <span class="step-num">1</span>
+          <h2>Upload your CSV</h2>
+        </div>
+        <label id="dropzone" class="dropzone" for="file-input">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M12 3v12m0-12 4 4m-4-4-4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+          </svg>
+          <span class="dz-text"><strong>Click to choose a file</strong> or drag it here</span>
+          <span class="dz-sub">.csv only</span>
+        </label>
+        <input id="file-input" type="file" accept=".csv" hidden />
+        <p id="upload-status" class="hint"></p>
+      </section>
+
+      <!-- STEP 2: Mapping -->
+      <section class="card hidden" id="step-map">
+        <div class="card-head">
+          <span class="step-num">2</span>
+          <h2>Map your columns</h2>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="col-name">Business Name column</label>
+            <select id="col-name"></select>
+          </div>
+          <div class="field">
+            <label for="col-url">Website / URL column</label>
+            <select id="col-url"></select>
+          </div>
+          <div class="field">
+            <label for="col-status">Status column <span class="optional">(optional)</span></label>
+            <select id="col-status">
+              <option value="">— None —</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="status-filter-block" class="status-block hidden">
+          <p class="hint block-hint">Rows are included if their status is checked below, or if you keep blank statuses included.</p>
+          <label class="checkbox-row">
+            <input type="checkbox" id="include-blank" checked />
+            <span>Include rows with a blank / empty status</span>
+          </label>
+          <div id="status-values" class="chip-grid"></div>
+        </div>
+
+        <button id="start-btn" class="btn-primary" disabled>Start scraping</button>
+      </section>
+
+      <!-- STEP 3: Progress -->
+      <section class="card hidden" id="step-progress">
+        <div class="card-head">
+          <span class="step-num">3</span>
+          <h2>Scraping in progress</h2>
+        </div>
+
+        <div class="progress-track">
+          <div id="progress-bar" class="progress-fill"></div>
+        </div>
+        <div class="progress-meta">
+          <span id="progress-count">0 / 0</span>
+          <span id="progress-found">0 emails found</span>
+        </div>
+        <p class="hint" id="current-row"></p>
+
+        <div class="log-box" id="log-box"></div>
+
+        <button id="cancel-btn" class="btn-secondary">Cancel</button>
+      </section>
+
+      <!-- STEP 4: Done -->
+      <section class="card hidden" id="step-done">
+        <div class="card-head">
+          <span class="step-num">✓</span>
+          <h2>Done</h2>
+        </div>
+        <p id="done-summary" class="hint"></p>
+        <a id="download-link" class="btn-primary" href="#" download>Download Aryx_Prospector_Leads.csv</a>
+        <button id="reset-btn" class="btn-secondary">Start over</button>
+      </section>
+
+      <p id="error-banner" class="error-banner hidden"></p>
+
+    </main>
+
+    <footer class="footer">Runs entirely on your machine — no data leaves this app except direct requests to the websites you're prospecting.</footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
