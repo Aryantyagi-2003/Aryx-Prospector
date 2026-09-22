@@ -1,6 +1,7 @@
 const state = {
   uploadId: null,
   columns: [],
+  preview: [],
   jobId: null,
   pollTimer: null,
 };
@@ -64,8 +65,10 @@ async function handleFile(file) {
 
     state.uploadId = data.upload_id;
     state.columns = data.columns;
+    state.preview = data.preview || [];
     el("upload-status").textContent = `Loaded "${file.name}" — ${data.row_count} rows, ${data.columns.length} columns.`;
 
+    renderPreviewTable();
     populateColumnSelects();
     el("step-map").classList.remove("hidden");
   } catch (err) {
@@ -75,6 +78,34 @@ async function handleFile(file) {
 }
 
 // --- Step 2: Mapping ---------------------------------------------------
+
+function renderPreviewTable() {
+  const table = el("preview-table");
+  table.innerHTML = "";
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  state.columns.forEach((col) => {
+    const th = document.createElement("th");
+    th.textContent = col;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  state.preview.forEach((row) => {
+    const tr = document.createElement("tr");
+    state.columns.forEach((col) => {
+      const td = document.createElement("td");
+      const val = row[col];
+      td.textContent = val === null || val === undefined || val === "" ? "—" : val;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+}
 
 function populateColumnSelects() {
   const nameSel = el("col-name");
@@ -91,19 +122,27 @@ function populateColumnSelects() {
     statusSel.appendChild(new Option(col, col));
   });
 
-  // Reasonable guesses based on common header names.
-  guessSelect(nameSel, ["business name", "name", "company"]);
-  guessSelect(urlSel, ["website / url", "website", "url", "site"]);
-  guessSelect(statusSel, ["status"]);
+  // Reasonable guesses based on common header names (exact match first,
+  // then substring match, so e.g. "Business Website" still matches "website").
+  guessSelect(urlSel, ["website / url", "website", "url", "site", "domain", "web"]);
+  guessSelect(statusSel, ["status", "stage", "deal status"]);
+  guessSelect(nameSel, ["business name", "company name", "name", "company", "business", "client", "organization"]);
 
   validateMapping();
   if (statusSel.value) loadStatusValues(statusSel.value);
 }
 
 function guessSelect(selectEl, candidates) {
-  const options = Array.from(selectEl.options);
+  const options = Array.from(selectEl.options).filter((o) => o.value);
+
+  // Pass 1: exact header match.
   for (const candidate of candidates) {
     const match = options.find((o) => o.value.toLowerCase() === candidate);
+    if (match) { selectEl.value = match.value; return; }
+  }
+  // Pass 2: header contains the candidate word (e.g. "Business Website").
+  for (const candidate of candidates) {
+    const match = options.find((o) => o.value.toLowerCase().includes(candidate));
     if (match) { selectEl.value = match.value; return; }
   }
 }

@@ -60,10 +60,13 @@ def upload():
         os.remove(path)
         return jsonify({"error": "CSV has no columns."}), 400
 
+    preview = df.head(4).fillna("").to_dict(orient="records")
+
     return jsonify({
         "upload_id": upload_id,
         "columns": list(df.columns),
         "row_count": len(df),
+        "preview": preview,
     })
 
 
