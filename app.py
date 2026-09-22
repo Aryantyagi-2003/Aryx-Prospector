@@ -46,6 +46,7 @@ def upload():
     if not file.filename.lower().endswith(".csv"):
         return jsonify({"error": "Please upload a .csv file."}), 400
 
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     upload_id = uuid.uuid4().hex
     path = os.path.join(UPLOAD_DIR, f"{upload_id}.csv")
     file.save(path)
@@ -135,6 +136,7 @@ def _run_job(job_id, path, name_col, url_col, status_col, included_statuses, inc
             time.sleep(1)
 
         out_df = pd.DataFrame(results, columns=["Business Name", "URL", "Email"])
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
         out_path = os.path.join(OUTPUT_DIR, f"{job_id}.csv")
         out_df.to_csv(out_path, index=False)
 
