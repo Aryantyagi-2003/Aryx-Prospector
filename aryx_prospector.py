@@ -22,6 +22,7 @@ OUTPUT_CSV = "Aryx_Prospector_Leads.csv"
 NAME_COL = "Business Name"
 URL_COL = "Website / URL"
 STATUS_COL = "Status"
+EMAIL_COL = "Email"  # optional - if present and already filled, reused as-is
 
 EXCLUDED_STATUSES = {"no deal", "awaiting response", "dead"}
 INCLUDED_STATUS = "to contact"
@@ -44,10 +45,24 @@ def filter_eligible_rows(df: pd.DataFrame) -> pd.DataFrame:
     return df[has_website & not_no_website & status_ok].copy()
 
 
+def dedupe_results(results: list[dict]) -> tuple[list[dict], int]:
+    """Drop rows with a repeated (Business Name, URL) pair, keeping the first."""
+    seen = set()
+    deduped = []
+    for row in results:
+        key = (row["Business Name"].strip().lower(), row["URL"].strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    return deduped, len(results) - len(deduped)
+
+
 def main():
-    df = pd.read_csv(INPUT_CSV)
+    df = pd.read_csv(INPUT_CSV, dtype=str)
 
     eligible = filter_eligible_rows(df)
+    has_email_col = EMAIL_COL in eligible.columns
     print(f"Found {len(eligible)} eligible rows out of {len(df)} total rows.")
 
     results = []
@@ -57,12 +72,23 @@ def main():
         raw_url = eligible.iloc[i - 1][URL_COL]
         url = normalize_url(raw_url)
 
-        print(f"[{i}/{len(eligible)}] Scraping {business_name} -> {url}")
-        email, error = scrape_email(url)
-        if email:
-            print(f"  -> Found: {email}")
+        existing_email = ""
+        if has_email_col:
+            raw_email = eligible.iloc[i - 1][EMAIL_COL]
+            if not pd.isna(raw_email):
+                existing_email = str(raw_email).strip()
+
+        if existing_email:
+            print(f"[{i}/{len(eligible)}] {business_name} -> already has email, skipping scrape")
+            email, error = existing_email, ""
         else:
-            print(f"  -> No email found.{' (' + error + ')' if error else ''}")
+            print(f"[{i}/{len(eligible)}] Scraping {business_name} -> {url}")
+            email, error = scrape_email(url)
+            if email:
+                print(f"  -> Found: {email}")
+            else:
+                print(f"  -> No email found.{' (' + error + ')' if error else ''}")
+            time.sleep(REQUEST_DELAY_SECONDS)
 
         results.append({
             "Business Name": business_name,
@@ -70,11 +96,13 @@ def main():
             "Email": email,
         })
 
-        time.sleep(REQUEST_DELAY_SECONDS)
+    deduped, duplicate_count = dedupe_results(results)
+    if duplicate_count:
+        print(f"\nRemoved {duplicate_count} duplicate row(s).")
 
-    output_df = pd.DataFrame(results, columns=["Business Name", "URL", "Email"])
+    output_df = pd.DataFrame(deduped, columns=["Business Name", "URL", "Email"])
     output_df.to_csv(OUTPUT_CSV, index=False)
-    print(f"\nDone. Wrote {len(output_df)} rows to {OUTPUT_CSV}")
+    print(f"\nDone. Wrote {len(output_df)} unique rows to {OUTPUT_CSV}")
 
 
 if __name__ == "__main__":

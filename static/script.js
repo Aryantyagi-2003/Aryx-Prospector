@@ -128,8 +128,11 @@ el("cancel-btn").addEventListener("click", async () => {
 
 function finishJob(data) {
   showStep("step-done");
-  el("done-summary").textContent =
-    `Scraped ${data.total} eligible businesses and found ${data.found_count} email addresses.`;
+  let summary = `Processed ${data.total} eligible businesses and found ${data.found_count} email addresses.`;
+  if (data.duplicate_count > 0) {
+    summary += ` Removed ${data.duplicate_count} duplicate row(s) — ${data.output_count} unique leads written.`;
+  }
+  el("done-summary").textContent = summary;
   el("download-link").href = `/api/download/${state.jobId}`;
 }
 

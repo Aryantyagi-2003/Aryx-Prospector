@@ -33,6 +33,7 @@ app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB upload cap
 NAME_COL = "Business Name"
 URL_COL = "Website / URL"
 STATUS_COL = "Status"
+EMAIL_COL = "Email"  # optional - if present and already filled, reused as-is
 
 EXCLUDED_STATUSES = {"no deal", "awaiting response", "dead"}
 INCLUDED_STATUS = "to contact"
@@ -60,11 +61,25 @@ def _filter_eligible(df: pd.DataFrame) -> pd.DataFrame:
     return df[has_website & status_ok].copy()
 
 
+def _dedupe(results: list[dict]) -> tuple[list[dict], int]:
+    """Drop rows with a repeated (Business Name, URL) pair, keeping the first."""
+    seen = set()
+    deduped = []
+    for row in results:
+        key = (row["Business Name"].strip().lower(), row["URL"].strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    return deduped, len(results) - len(deduped)
+
+
 def _run_job(job_id, path):
     job = JOBS[job_id]
     try:
         df = pd.read_csv(path, dtype=str)
         eligible = _filter_eligible(df)
+        has_email_col = EMAIL_COL in eligible.columns
 
         job["total"] = len(eligible)
         job["state"] = "running"
@@ -80,7 +95,18 @@ def _run_job(job_id, path):
             url = normalize_url(eligible.iloc[i][URL_COL])
 
             job["current"] = business_name
-            email, error = scrape_email(url)
+
+            existing_email = ""
+            if has_email_col:
+                raw_email = eligible.iloc[i][EMAIL_COL]
+                if not pd.isna(raw_email):
+                    existing_email = str(raw_email).strip()
+
+            if existing_email:
+                email, error = existing_email, ""
+            else:
+                email, error = scrape_email(url)
+                time.sleep(1)  # only throttle when we actually hit the network
 
             results.append({"Business Name": business_name, "URL": url, "Email": email})
             job["processed"] = i + 1
@@ -90,14 +116,17 @@ def _run_job(job_id, path):
                 "email": email,
                 "error": error,
             })
-            time.sleep(1)
 
-        out_df = pd.DataFrame(results, columns=["Business Name", "URL", "Email"])
+        deduped, duplicate_count = _dedupe(results)
+
+        out_df = pd.DataFrame(deduped, columns=["Business Name", "URL", "Email"])
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         out_path = os.path.join(OUTPUT_DIR, f"{job_id}.csv")
         out_df.to_csv(out_path, index=False)
 
-        job["found_count"] = sum(1 for r in results if r["Email"])
+        job["found_count"] = sum(1 for r in deduped if r["Email"])
+        job["duplicate_count"] = duplicate_count
+        job["output_count"] = len(deduped)
         job["state"] = "done"
     except Exception as exc:
         job["state"] = "error"
@@ -143,6 +172,8 @@ def upload():
             "current": "",
             "log": [],
             "found_count": 0,
+            "duplicate_count": 0,
+            "output_count": 0,
             "error": None,
             "cancelled": False,
         }
@@ -164,6 +195,8 @@ def progress(job_id):
         "total": job["total"],
         "current": job["current"],
         "found_count": job["found_count"],
+        "duplicate_count": job["duplicate_count"],
+        "output_count": job["output_count"],
         "error": job["error"],
         "log_tail": job["log"][-10:],
     })
