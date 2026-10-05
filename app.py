@@ -56,17 +56,30 @@ def _filter_eligible(df: pd.DataFrame) -> pd.DataFrame:
     is_blank_status = status.eq("")
     is_to_contact = status.eq(INCLUDED_STATUS)
     is_excluded = status.isin(EXCLUDED_STATUSES)
-
     status_ok = (is_to_contact | is_blank_status) & ~is_excluded
-    return df[has_website & status_ok].copy()
+
+    # A row with no website still belongs in the output if it already has
+    # an email - there's nothing to scrape, but the data shouldn't be lost.
+    if EMAIL_COL in df.columns:
+        has_email = df[EMAIL_COL].fillna("").astype(str).str.strip().ne("")
+    else:
+        has_email = pd.Series(False, index=df.index)
+
+    return df[(has_website & status_ok) | has_email].copy()
 
 
 def _dedupe(results: list[dict]) -> tuple[list[dict], int]:
-    """Drop rows with a repeated (Business Name, URL) pair, keeping the first."""
+    """Drop rows with a repeated (Business Name, URL) pair, keeping the first.
+
+    Business Name is matched case-sensitively - two different businesses
+    whose names only differ by capitalization (e.g. "Gigi's Bakery" vs
+    "GiGi's Bakery") must not be merged into one. URL is still compared
+    case-insensitively since domains aren't case-sensitive.
+    """
     seen = set()
     deduped = []
     for row in results:
-        key = (row["Business Name"].strip().lower(), row["URL"].strip().lower())
+        key = (row["Business Name"].strip(), row["URL"].strip().lower())
         if key in seen:
             continue
         seen.add(key)
@@ -92,7 +105,10 @@ def _run_job(job_id, path):
 
             raw_name = eligible.iloc[i][NAME_COL]
             business_name = "" if pd.isna(raw_name) else str(raw_name).strip()
-            url = normalize_url(eligible.iloc[i][URL_COL])
+
+            raw_url = eligible.iloc[i][URL_COL]
+            url_str = "" if pd.isna(raw_url) else str(raw_url).strip()
+            url = "" if (not url_str or url_str.lower() == "no website") else normalize_url(url_str)
 
             job["current"] = business_name
 
@@ -104,9 +120,11 @@ def _run_job(job_id, path):
 
             if existing_email:
                 email, error = existing_email, ""
-            else:
+            elif url:
                 email, error = scrape_email(url)
                 time.sleep(1)  # only throttle when we actually hit the network
+            else:
+                email, error = "", ""
 
             results.append({"Business Name": business_name, "URL": url, "Email": email})
             job["processed"] = i + 1

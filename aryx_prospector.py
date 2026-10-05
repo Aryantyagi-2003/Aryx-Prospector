@@ -32,25 +32,36 @@ REQUEST_DELAY_SECONDS = 1  # be polite between requests
 
 def filter_eligible_rows(df: pd.DataFrame) -> pd.DataFrame:
     website = df[URL_COL].fillna("").astype(str).str.strip()
-    has_website = website.ne("")
-    not_no_website = website.str.lower() != "no website"
+    has_website = website.ne("") & website.str.lower().ne("no website")
 
     status = df[STATUS_COL].fillna("").astype(str).str.strip().str.lower()
     is_blank_status = status.eq("")
     is_to_contact = status.eq(INCLUDED_STATUS)
     is_excluded = status.isin(EXCLUDED_STATUSES)
-
     status_ok = (is_to_contact | is_blank_status) & ~is_excluded
 
-    return df[has_website & not_no_website & status_ok].copy()
+    # A row with no website still belongs in the output if it already has
+    # an email - there's nothing to scrape, but the data shouldn't be lost.
+    if EMAIL_COL in df.columns:
+        has_email = df[EMAIL_COL].fillna("").astype(str).str.strip().ne("")
+    else:
+        has_email = pd.Series(False, index=df.index)
+
+    return df[(has_website & status_ok) | has_email].copy()
 
 
 def dedupe_results(results: list[dict]) -> tuple[list[dict], int]:
-    """Drop rows with a repeated (Business Name, URL) pair, keeping the first."""
+    """Drop rows with a repeated (Business Name, URL) pair, keeping the first.
+
+    Business Name is matched case-sensitively - two different businesses
+    whose names only differ by capitalization (e.g. "Gigi's Bakery" vs
+    "GiGi's Bakery") must not be merged into one. URL is still compared
+    case-insensitively since domains aren't case-sensitive.
+    """
     seen = set()
     deduped = []
     for row in results:
-        key = (row["Business Name"].strip().lower(), row["URL"].strip().lower())
+        key = (row["Business Name"].strip(), row["URL"].strip().lower())
         if key in seen:
             continue
         seen.add(key)
@@ -69,8 +80,10 @@ def main():
     for i in range(1, len(eligible) + 1):
         raw_name = eligible.iloc[i - 1][NAME_COL]
         business_name = "" if pd.isna(raw_name) else str(raw_name).strip()
+
         raw_url = eligible.iloc[i - 1][URL_COL]
-        url = normalize_url(raw_url)
+        url_str = "" if pd.isna(raw_url) else str(raw_url).strip()
+        url = "" if (not url_str or url_str.lower() == "no website") else normalize_url(url_str)
 
         existing_email = ""
         if has_email_col:
@@ -81,7 +94,7 @@ def main():
         if existing_email:
             print(f"[{i}/{len(eligible)}] {business_name} -> already has email, skipping scrape")
             email, error = existing_email, ""
-        else:
+        elif url:
             print(f"[{i}/{len(eligible)}] Scraping {business_name} -> {url}")
             email, error = scrape_email(url)
             if email:
@@ -89,6 +102,9 @@ def main():
             else:
                 print(f"  -> No email found.{' (' + error + ')' if error else ''}")
             time.sleep(REQUEST_DELAY_SECONDS)
+        else:
+            print(f"[{i}/{len(eligible)}] {business_name} -> no website and no existing email, leaving blank")
+            email, error = "", ""
 
         results.append({
             "Business Name": business_name,
