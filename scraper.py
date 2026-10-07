@@ -78,6 +78,20 @@ def extract_email_from_html(html: str) -> str:
             if email and is_valid_email(email):
                 return email
 
+    # Many small-business sites (page builders, SEO plugins) embed their
+    # contact email in a JSON-LD <script type="application/ld+json"> block
+    # for Google's LocalBusiness schema, with no matching visible text or
+    # mailto link anywhere on the page. BeautifulSoup's get_text() skips
+    # script content entirely, so this needs its own targeted pass - scoped
+    # to just this script type (not all <script> tags) to avoid picking up
+    # unrelated hex IDs from analytics/error-tracking snippets.
+    for script in soup.find_all("script", type="application/ld+json"):
+        if not script.string:
+            continue
+        for match in EMAIL_REGEX.findall(script.string):
+            if is_valid_email(match):
+                return match
+
     page_text = soup.get_text(separator=" ")
     matches = EMAIL_REGEX.findall(page_text)
     for match in matches:
